@@ -2,7 +2,7 @@
 #include <TFT_eSPI.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
-//this file should define WIFI_SSID and WIFI_PWD
+//this file should define WIFI_SSID and WIFI_PWD, MQTT_USER and MQTT_PWD,
 //it is not included in the repository for security reasons
 #include "password.h"
 #include <PubSubClient.h>
@@ -73,7 +73,7 @@ bool connectMqtt() {
         tft.println("Connecting to MQTT...");
         String clientId = "ESP32Client-" + String(random(0xffff), HEX);
         
-        if (mqttClient.connect(clientId.c_str())) {
+        if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PWD)) {
             tft.println("MQTT connected!");
             return true;
         } else {
