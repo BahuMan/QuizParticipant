@@ -7,6 +7,7 @@
 #include "password.h"
 #include <PubSubClient.h>
 
+#include "quiz.hpp"
 // see incoming messages with command:
 // mosquitto_sub -h localhost -t hello/# -u bart -P bart
 
@@ -16,6 +17,8 @@ IPAddress mqttServer(192,168,0,156);
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
+
+statusEnum status(statusEnum::FINDQUIZ);
 
 void setupDisplay() {
     tft.setRotation(4); //setRotation also sets some flags inside the AdaFruit drivers. After that, we manually set MADCTL
@@ -77,6 +80,7 @@ void setup() {
 
 void showDiamondColors();
 
+
 void loop() {
     tft.setCursor(10, 50);
     tft.setTextSize(2);
@@ -96,10 +100,8 @@ void loop() {
     if (!mqttClient.connected()) {
         connectMqtt();
     }
-    else {
-        mqttClient.publish("hello", "hello world");
-        mqttClient.loop();
-    }
+    mqttClient.loop();
+
     
     delay(2000);
     showDiamondColors();

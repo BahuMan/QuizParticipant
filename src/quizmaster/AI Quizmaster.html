@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quizmaster Control Panel</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        h1, h2 {
+            color: #005a9c;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        .section {
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        button {
+            display: inline-block;
+            padding: 12px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status-connected {
+            background-color: #e6f7ec;
+            color: #006421;
+        }
+        .status-disconnected {
+            background-color: #fdecea;
+            color: #a80000;
+        }
+        .correction-group {
+            margin-top: 15px;
+        }
+        .correction-group label {
+            display: inline-block;
+            margin-right: 20px;
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Quizmaster Panel</h1>
+        <div id="status">Connecting to MQTT Broker...</div>
+
+        <hr>
+
+        <div class="section">
+            <h2>1. Announce Quiz</h2>
+            <label for="quizName">Quiz Name:</label>
+            <input type="text" id="quizName" placeholder="e.g., 'Weekly Tech Trivia'">
+            <button onclick="announceQuiz()">Announce Quiz</button>
+        </div>
+
+        <div class="section">
+            <h2>2. Submit Question & Answers</h2>
+            <label for="question">Question:</label>
+            <input type="text" id="question" placeholder="e.g., 'What does HTML stand for?'">
+
+            <label for="choiceA">Choice A:</label>
+            <input type="text" id="choiceA" placeholder="Answer A">
+
+            <label for="choiceB">Choice B:</label>
+            <input type="text" id="choiceB" placeholder="Answer B">
+
+            <label for="choiceX">Choice X:</label>
+            <input type="text" id="choiceX" placeholder="Answer X">
+
+            <label for="choiceY">Choice Y:</label>
+            <input type="text" id="choiceY" placeholder="Answer Y">
+
+            <button onclick="submitQuestion()">Submit Question</button>
+        </div>
+
+        <div class="section">
+            <h2>3. Publish Correction</h2>
+            <p>Select the correct answer for the question you just submitted:</p>
+
+            <div class="correction-group">
+                <label>
+                    <input type="radio" name="correctAnswer" value="A">
+                    <strong id="labelA">Choice A</strong>
+                </label>
+                <label>
+                    <input type="radio" name="correctAnswer" value="B">
+                    <strong id="labelB">Choice B</strong>
+                </label>
+                <label>
+                    <input type="radio" name="correctAnswer" value="X">
+                    <strong id="labelX">Choice X</strong>
+                </label>
+                <label>
+                    <input type="radio" name="correctAnswer" value="Y">
+                    <strong id="labelY">Choice Y</strong>
+                </label>
+            </div>
+
+            <br>
+            <button onclick="submitCorrection()">Publish Correction</button>
+        </div>
+    </div>
+
+    <script>
+        // --- MQTT Configuration ---
+        //
+        // IMPORTANT: Change these details to match your MQTT broker.
+        // This example uses a public, temporary broker for testing.
+        //
+        const brokerHost = "localhost";
+        const brokerPort = 1883; // WebSocket port
+        const clientId = "quizmaster_client_" + Math.random().toString(16).substr(2, 8); // Unique client ID
+
+        // --- MQTT Topics ---
+        const TOPIC_ANNOUNCE = "quiz/announce";
+        const TOPIC_QUESTION = "/question";
+        const TOPIC_CHOICE_A = "/choiceA";
+        const TOPIC_CHOICE_B = "/choiceB";
+        const TOPIC_CHOICE_X = "/choiceX";
+        const TOPIC_CHOICE_Y = "/choiceY";
+        const TOPIC_CORRECTION = "/correction";
+
+        // --- Client Initialization ---
+        const statusDiv = document.getElementById("status");
+        let client = new Paho.MQTT.Client(brokerHost, brokerPort, clientId);
+
+        // --- Client Callbacks ---
+        client.onConnectionLost = onConnectionLost;
+        client.onMessageArrived = onMessageArrived; // Not used, but good to have
+
+        // --- Connect to Broker ---
+        client.connect({
+            onSuccess: onConnect,
+            onFailure: onFailure,
+            useSSL: false // Set to true if your broker uses SSL (e.g., port 8081 on HiveMQ)
+        });
+
+        // --- Callback Functions ---
+        function onConnect() {
+            console.log("Connected to MQTT broker");
+            statusDiv.innerHTML = `Connected to ${brokerHost}`;
+            statusDiv.className = "status-connected";
+        }
+
+        function onFailure(response) {
+            console.error("Connection failed: " + response.errorMessage);
+            statusDiv.innerHTML = `Connection Failed: ${response.errorMessage}`;
+            statusDiv.className = "status-disconnected";
+        }
+
+        function onConnectionLost(response) {
+            if (response.errorCode !== 0) {
+                console.log("Connection lost: " + response.errorMessage);
+                statusDiv.innerHTML = "Connection Lost. Reconnecting...";
+                statusDiv.className = "status-disconnected";
+                // Optionally, try to reconnect
+                // client.connect({ onSuccess: onConnect, onFailure: onFailure });
+            }
+        }
+
+        // We don't need to receive messages for this app, but this is the function
+        function onMessageArrived(message) {
+            console.log("Message arrived on topic " + message.destinationName + ": " + message.payloadString);
+        }
+
+        // --- Helper Function to Publish ---
+        function publish(topic, payload) {
+            if (!client.isConnected()) {
+                alert("Not connected to MQTT broker! Please check console.");
+                return;
+            }
+            let message = new Paho.MQTT.Message(payload);
+            message.destinationName = topic;
+            client.send(message);
+            console.log(`Published to ${topic}: ${payload}`);
+        }
+
+        // --- 1. Announce Quiz Function ---
+        function announceQuiz() {
+            const quizName = document.getElementById("quizName").value;
+            if (!quizName) {
+                alert("Please enter a quiz name.");
+                return;
+            }
+            publish(TOPIC_ANNOUNCE, quizName);
+            alert(`Quiz '${quizName}' announced on topic '${TOPIC_ANNOUNCE}'`);
+        }
+
+        // --- 2. Submit Question Function ---
+        function submitQuestion() {
+            const question = document.getElementById("question").value;
+            const choiceA = document.getElementById("choiceA").value;
+            const choiceB = document.getElementById("choiceB").value;
+            const choiceX = document.getElementById("choiceX").value;
+            const choiceY = document.getElementById("choiceY").value;
+
+            if (!question || !choiceA || !choiceB || !choiceX || !choiceY) {
+                alert("Please fill in the question and all four answer choices.");
+                return;
+            }
+
+            // Publish each piece of information to its own topic
+            publish(TOPIC_QUESTION, question);
+            publish(TOPIC_CHOICE_A, choiceA);
+            publish(TOPIC_CHOICE_B, choiceB);
+            publish(TOPIC_CHOICE_X, choiceX);
+            publish(TOPIC_CHOICE_Y, choiceY);
+
+            // Update the radio button labels for the correction section
+            document.getElementById("labelA").innerText = `A: ${choiceA}`;
+            document.getElementById("labelB").innerText = `B: ${choiceB}`;
+            document.getElementById("labelX").innerText = `X: ${choiceX}`;
+            document.getElementById("labelY").innerText = `Y: ${choiceY}`;
+
+            alert("Question and answers published to their respective topics.");
+        }
+
+        // --- 3. Submit Correction Function ---
+        function submitCorrection() {
+            const correctChoice = document.querySelector('input[name="correctAnswer"]:checked');
+
+            if (!correctChoice) {
+                alert("Please select the correct answer (A, B, X, or Y).");
+                return;
+            }
+
+            const correctionValue = correctChoice.value; // This will be "A", "B", "X", or "Y"
+            publish(TOPIC_CORRECTION, correctionValue);
+
+            alert(`Correction ('${correctionValue}') published to topic '${TOPIC_CORRECTION}'`);
+
+            // Clear the selection
+            correctChoice.checked = false;
+        }
+    </script>
+</body>
+</html>
