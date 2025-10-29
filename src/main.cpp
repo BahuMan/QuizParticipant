@@ -6,7 +6,9 @@
 //it is not included in the repository for security reasons
 #include "password.h"
 #include <PubSubClient.h>
-#include <ESP32Ping.h>
+
+// see incoming messages with command:
+// mosquitto_sub -h localhost -t hello/# -u bart -P bart
 
 TFT_eSPI    tft = TFT_eSPI();
 TFT_eSprite square = TFT_eSprite(&tft);
@@ -51,36 +53,16 @@ void setupMqtt() {
 }
 
 bool connectMqtt() {
-    if (!mqttClient.connected()) {
-        // Ping MQTT server before attempting connection
-        tft.print("Pinging MQTT server ");
-        tft.print(mqttServer);
-        tft.println("...");
-        
-        bool pingSuccess = Ping.ping(mqttServer, 3);
-        
-        if (pingSuccess) {
-            tft.println("Ping successful!");
-            tft.print("Avg time: ");
-            tft.print(Ping.averageTime());
-            tft.println("ms");
-        } else {
-            tft.println("Ping failed!");
-            tft.println("MQTT server unreachable");
-            return false;
-        }
-        
-        tft.println("Connecting to MQTT...");
-        String clientId = "ESP32Client-" + String(random(0xffff), HEX);
-        
-        if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PWD)) {
-            tft.println("MQTT connected!");
-            return true;
-        } else {
-            tft.print("MQTT failed, rc=");
-            tft.println(mqttClient.state());
-            return false;
-        }
+    tft.println("Connecting to MQTT...");
+    String clientId = "ESP32Client-" + String(random(0xffff), HEX);
+    
+    if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PWD)) {
+        tft.println("MQTT connected!");
+        return true;
+    } else {
+        tft.print("MQTT failed, rc=");
+        tft.println(mqttClient.state());
+        return false;
     }
     return true;
 }
@@ -108,7 +90,6 @@ void loop() {
     }
     else {
         tft.println(WiFi.localIP());
-        tft.print("My IP: ");
     }
     
     // Ensure MQTT connection
