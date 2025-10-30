@@ -18,6 +18,8 @@ IPAddress mqttServer(192,168,0,156);
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
+Participant participant(tft, mqttClient);
+
 statusEnum status(statusEnum::FINDQUIZ);
 
 void setupDisplay() {
@@ -27,12 +29,12 @@ void setupDisplay() {
     tft.writedata(TFT_MAD_BGR | TFT_MAD_MV); //exchange red and blue bytes, and mirror x-coordinates
     tft.fillScreen(TFT_BLACK);
 
-    square.createSprite(100, 100);
+    square.createSprite(50, 50);
     square.fillSprite(TFT_BLACK);
-    square.fillRect(0, 0, 45, 45, TFT_RED);
-    square.fillRect(55, 0, 45, 45, TFT_GREEN);
-    square.fillRect(0, 55, 45, 45, TFT_BLUE);
-    square.fillRect(55, 55, 45, 45, TFT_YELLOW);
+    square.fillRect(0, 0, 20, 20, TFT_RED);
+    square.fillRect(30, 0, 20, 20, TFT_GREEN);
+    square.fillRect(0, 30, 20, 20, TFT_BLUE);
+    square.fillRect(30, 30, 20, 20, TFT_YELLOW);
 }
 
 bool setupWifi() {
@@ -92,10 +94,26 @@ void loop() {
         tft.println("WiFi Disconnected!");
         setupWifi();
     }
-    else {
-        tft.println(WiFi.localIP());
-    }
     
+    switch (status)
+    {
+    case statusEnum::FINDQUIZ:
+        status = participant.FindQuiz();
+        break;
+    case statusEnum::GETQUESTION:
+        status = participant.GetQuestion();
+        break;
+    case statusEnum::SUBMITRESPONSE:
+        status = participant.SubmitResponse();
+        break;
+    case statusEnum::GETCORRECTION:
+        status = participant.GetCorrection();
+        break;
+    default:
+        tft.println("Unknown status");
+        delay(2000);
+        break;
+    }
     // Ensure MQTT connection
     if (!mqttClient.connected()) {
         connectMqtt();
@@ -103,7 +121,6 @@ void loop() {
     mqttClient.loop();
 
     
-    delay(2000);
     showDiamondColors();
     delay(2000);
 }
@@ -113,15 +130,15 @@ void showDiamondColors() {
     tft.setPivot(200, 150);
     square.pushRotated(45);
     tft.setTextColor(TFT_BLACK, TFT_RED);
-    tft.setCursor(200 - 5, 150 - 40);
+    tft.setCursor(200 - 5, 150 - 25);
     tft.println("X");
     tft.setTextColor(TFT_BLACK, TFT_GREEN);
-    tft.setCursor(200 + 30, 150 - 10);
+    tft.setCursor(200 + 17, 150 - 10);
     tft.println("A");
     tft.setTextColor(TFT_BLACK, TFT_BLUE);
-    tft.setCursor(200 - 40, 150 - 10);
+    tft.setCursor(200 - 23, 150 - 10);
     tft.println("Y");
     tft.setTextColor(TFT_BLACK, TFT_YELLOW);
-    tft.setCursor(200 - 5, 150 + 30);
+    tft.setCursor(200 - 5, 150 + 15);
     tft.println("B");
 }
