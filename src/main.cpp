@@ -7,9 +7,13 @@
 #include "password.h"
 #include <PubSubClient.h>
 
+#include "Input.hpp"
 #include "quiz.hpp"
+
 // see incoming messages with command:
-// mosquitto_sub -h localhost -t hello/# -u bart -P bart
+// mosquitto_sub -h localhost -t Quiz/# -u bart -P bart
+// simulate quiz master with:
+// mosquitto_pub -h localhost -u bart -P bart -t Quiz/Announce -m "HelloWorld"
 
 TFT_eSPI    tft = TFT_eSPI();
 TFT_eSprite square = TFT_eSprite(&tft);
@@ -18,8 +22,8 @@ IPAddress mqttServer(192,168,0,156);
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
-Participant participant(tft, mqttClient);
-
+Input input;
+Participant participant(tft, input, mqttClient);
 statusEnum status(statusEnum::FINDQUIZ);
 
 void setupDisplay() {
@@ -57,12 +61,17 @@ void setupMqtt() {
     tft.println("MQTT configured");
 }
 
+void MqttToParticipantCallback (char* topic, byte* payload, unsigned int length) {
+    participant.mqttCallback(topic, payload, length);
+}
+
 bool connectMqtt() {
     tft.println("Connecting to MQTT...");
     String clientId = "ESP32Client-" + String(random(0xffff), HEX);
     
     if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PWD)) {
         tft.println("MQTT connected!");
+        mqttClient.setCallback(MqttToParticipantCallback);
         return true;
     } else {
         tft.print("MQTT failed, rc=");

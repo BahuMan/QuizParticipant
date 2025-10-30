@@ -1,11 +1,14 @@
 #pragma once
+#include "Input.hpp"
+#include <TFT_eSPI.h>
+#include <PubSubClient.h>
 
 enum statusEnum {FINDQUIZ, GETQUESTION, SUBMITRESPONSE, GETCORRECTION};
 
 class Participant
 {
 public:
-    Participant(TFT_eSPI& tft, PubSubClient& mqttClient);
+    Participant(TFT_eSPI& tft, Input& input, PubSubClient& mqttClient);
 
     /**
      * get any quizzes published on the queue QuizAnnounce
@@ -29,7 +32,10 @@ public:
      */
     statusEnum GetCorrection();
 
+    void mqttCallback(char* topic, byte* payload, unsigned int length);
+
     private:
+        Input& input;
         TFT_eSPI& tft;
         PubSubClient& mqttClient;
         char quizQueue[100];

@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "Input.hpp"
-#include <string.h>
+//#include <string.h>
 
 // Define static variables
 bool Input::A = false, Input::A_prev = false;

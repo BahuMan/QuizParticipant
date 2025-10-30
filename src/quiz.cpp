@@ -2,17 +2,23 @@
 #include <TFT_eSPI.h>
 #include <PubSubClient.h>
 
+#include "Input.hpp"
 #include "quiz.hpp"
 
 
-Participant::Participant(TFT_eSPI& tft, PubSubClient& mqttClient) : tft(tft), mqttClient(mqttClient)
+Participant::Participant(TFT_eSPI& tft, Input& input, PubSubClient& mqttClient):
+    tft(tft),
+    input(input),
+    mqttClient(mqttClient)
 {
+
     this->choiceA[0] = '\0';
     this->choiceB[0] = '\0';
     this->choiceX[0] = '\0';
     this->choiceY[0] = '\0';
     this->question[0] = '\0';
     this->quizQueue[0] = '\0';
+
 };
 
 /**
@@ -22,7 +28,18 @@ Participant::Participant(TFT_eSPI& tft, PubSubClient& mqttClient) : tft(tft), mq
  */
 statusEnum Participant::FindQuiz()
 {
+    mqttClient.subscribe("Quiz/Announce");
+    mqttClient.publish("Quiz/Participant", "Hello from participant");
+
     tft.println("Finding Quiz...");
+    if (this->quizQueue[0] == '\0') {
+        delay(2000);
+        return FINDQUIZ;
+    }
+    this->question[0] = '\0'; //reset question
+    tft.print("Chosen quiz: ");
+    tft.println(this->quizQueue);
+    mqttClient.unsubscribe("Quiz/Announce");
     delay(2000);
     return GETQUESTION;
 }
@@ -55,4 +72,19 @@ statusEnum Participant::GetCorrection()
     tft.println("Getting Correction...");
     delay(2000);
     return FINDQUIZ;
+}
+
+void Participant::mqttCallback(char* topic, byte* payload, unsigned int length)
+{
+    if (length > 99) length = 99;
+
+    // Check topic and process message
+    if (strcmp(topic, "Quiz/Announce") == 0) {
+        memcpy(payload, this->quizQueue, length);
+        this->quizQueue[length] = '\0';
+    }
+    else {
+        tft.println("Unknown topic");
+        tft.println((char*)payload);
+    }
 }
