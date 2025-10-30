@@ -2,7 +2,7 @@
 
 code for Fri3dBadge 2024
 
-# MQQT broker
+# MQTT broker
 
 [Mosquitto](https://mosquitto.org/) is opensource and free.
 To install on OpenSuse Leap:
