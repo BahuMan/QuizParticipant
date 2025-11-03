@@ -2,6 +2,7 @@
 #include <TFT_eSPI.h>
 #include <PubSubClient.h>
 
+#include "pins2024.h"
 #include "Input.hpp"
 #include "quiz.hpp"
 
@@ -25,6 +26,7 @@ Participant::Participant(TFT_eSPI& tft, Input& input, PubSubClient& mqttClient):
  * get any quizzes published on the queue QuizAnnounce
  * and offer a choice to the user
  * when a quiz is chosen, return the next status
+ * for now, we just pick the first announced quiz
  */
 statusEnum Participant::FindQuiz()
 {
@@ -40,6 +42,11 @@ statusEnum Participant::FindQuiz()
     tft.print("Chosen quiz: ");
     tft.println(this->quizQueue);
     mqttClient.unsubscribe("Quiz/Announce");
+    char topic[150];
+    snprintf(topic, 150, "Quiz/%s/Questions", this->quizQueue);
+    mqttClient.subscribe(topic);
+    snprintf(topic, 150, "Quiz/%s/Choices", this->quizQueue);
+    mqttClient.subscribe(topic);
     delay(2000);
     return GETQUESTION;
 }
@@ -49,8 +56,28 @@ statusEnum Participant::FindQuiz()
  */
 statusEnum Participant::GetQuestion()
 {
+    if (this->input.hasBeenPressed(PIN_START)) {
+        return statusEnum::FINDQUIZ;
+    }
     tft.println("Getting Question...");
-    delay(2000);
+    if (this->question[0] == '\0') {
+        delay(2000);
+        return GETQUESTION;
+    }
+
+    // let's agree that answers have been published before
+    // the question is being published
+    tft.print("Q: ");
+    tft.println(this->question);
+    tft.println();
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.print("A: "); tft.println(this->choiceA);
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.print("B: "); tft.println(this->choiceB);
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.print("X: "); tft.println(this->choiceX);
+    tft.setTextColor(TFT_BLUE, TFT_BLACK);
+    tft.print("Y: "); tft.println(this->choiceY);
     return SUBMITRESPONSE;
 }   
 
@@ -77,11 +104,33 @@ statusEnum Participant::GetCorrection()
 void Participant::mqttCallback(char* topic, byte* payload, unsigned int length)
 {
     if (length > 99) length = 99;
-
+    char topicBuffer[150];
     // Check topic and process message
     if (strcmp(topic, "Quiz/Announce") == 0) {
         memcpy(payload, this->quizQueue, length);
         this->quizQueue[length] = '\0';
+    }
+    snprintf(topicBuffer, 150, "Quiz/%s/Questions", this->quizQueue);
+    if (strcmp(topic, topicBuffer) == 0) {
+        memcpy(payload, this->question, length);
+        this->question[length] = '\0';
+    }
+    snprintf(topicBuffer, 150, "Quiz/%s/Choices", this->quizQueue);
+    if (strcmp(topic, topicBuffer) == 0) {
+        // For simplicity, assume payload is formatted as "A:...,B:...,X:...,Y:..."
+        char* token = strtok((char*)payload, ",");
+        while (token != NULL) {
+            if (token[0] == 'A' && token[1] == ':') {
+                strncpy(this->choiceA, token + 2, 99);
+            } else if (token[0] == 'B' && token[1] == ':') {
+                strncpy(this->choiceB, token + 2, 99);
+            } else if (token[0] == 'X' && token[1] == ':') {
+                strncpy(this->choiceX, token + 2, 99);
+            } else if (token[0] == 'Y' && token[1] == ':') {
+                strncpy(this->choiceY, token + 2, 99);
+            }   
+            token = strtok(NULL, ",");
+        }
     }
     else {
         tft.println("Unknown topic");

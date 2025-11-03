@@ -93,9 +93,9 @@ void showDiamondColors();
 
 
 void loop() {
-    tft.setCursor(10, 50);
+    tft.setCursor(10, 20);
     tft.setTextSize(2);
-    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     
     if (WiFi.status() != WL_CONNECTED) {
         tft.fillScreen(TFT_BLACK);
@@ -130,8 +130,8 @@ void loop() {
     mqttClient.loop();
 
     
-    showDiamondColors();
-    delay(2000);
+    //showDiamondColors();
+    //delay(2000);
 }
 
 void showDiamondColors() {
